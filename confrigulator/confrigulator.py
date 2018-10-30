@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import dpath.util
+
 class Interpolator(object):
     def __init__(self, config):
         pass
@@ -7,28 +9,70 @@ class Interpolator(object):
         return value
 
 class Layer(object):
-    def __init__(self, name, data=None):
+    def __init__(self, name):
         self.name = name
         self.dirty = False
         self.writable = False
+
+    def exists(self, key):
+        raise Exception('Not implimented')
+
+    def get(self, key, default_value=None):
+        raise Exception('Not implimented')
+
+    def set(self, key, value):
+        raise Exception('Not implimented')
+
+    def has_key(self, key):
+        raise Exception('Not implimented')
+
+    def query(self, query_string):
+        raise Exception('Not implimented')
+
+    def write(self):
+        raise Exception('Not implimented')
+
+    def load(self, data):
+        raise Exception('Not implimented')
+
+class DictLayer(Layer):
+    def __init__(self, name, data=None):
+        super(DictLayer, self).__init__(name)
         self.data = dict()
         if data:
             self.load(data)
+        self.query_engine = DPathQueryEngine()
 
     def exists(self, key):
-        pass
+        try:
+            self.query(key)
+        except KeyNotFoundException:
+            return False
+        except InvalidKeyException:
+            return False
+        return True
 
-    def get(self, key):
-        return self.data.get()
+    def get(self, key, default_value=None):
+        try:
+            return self.query(key)
+        except KeyNotFoundException:
+            return default_value
 
     def set(self, key, value):
-        pass
+        self.dirty = True
+        self.data.set(key, value)
+
+    def has_key(self, key):
+        return self.data.has_key(key)
+
+    def query(self, query_string):
+        return self.query_engine.query(query_string, self.data)
 
     def write(self):
-        pass
+        raise Exception("Not a writable config layer.")
 
     def load(self, data):
-        pass
+        self.data = data
 
 class ObjectLayer(Layer):
     pass
@@ -36,11 +80,23 @@ class ObjectLayer(Layer):
 class YAMLLayer(Layer):
     pass
 
-class QueryParser(object):
-    pass
-
 class KeyNotFoundException(Exception):
     pass
+
+class InvalidKeyException(Exception):
+    pass
+
+class DPathQueryEngine:
+    def __init__(self, delimiter='.'):
+        self.delimiter = delimiter
+
+    def query(self, key, data):
+        try:
+            return dpath.util.get(data, key, separator=self.delimiter)
+        except KeyError as e:
+            raise KeyNotFoundException(key)
+        except IndexError as e:
+            raise InvalidKeyException()
 
 class ConfigQueryException(Exception):
     def __init__(self, message, query):
@@ -56,7 +112,7 @@ class LayerQuery(object):
 
     def execute(self):
         try:
-            self.result = self.layer.get(query)
+            self.result = self.layer.query(query)
             self.success = True
         except KeyNotFoundException as e:
             self.success = False
@@ -64,10 +120,9 @@ class LayerQuery(object):
         return self.success
 
 class ConfigQuery(object):
-    def __init__(self, config, query_parser, query_string, cast, return_default, default_value, return_first):
+    def __init__(self, config, query_string, cast, return_default, default_value, return_first):
         self.config = config
         self.query_string = query_string
-        self.query = list()
         self.cast = cast
         self.return_default = return_default
         self.default_value = default_value
@@ -104,9 +159,8 @@ class ConfigQuery(object):
 
 
 class Config(object):
-    def __init__(self, layers=None, query_parser=QueryParser, retain_queries=False):
+    def __init__(self, layers=None, retain_queries=False):
         self.layers = list()
-        self.query_parser = query_parser()
         self.queries = list()
         if layers:
             for layer in layers:
@@ -126,7 +180,6 @@ class Config(object):
     def query(self, query_string, cast=None, return_default=False, default_value=None, return_first=False, layer_name=None):
         query = Query(
             query_string,
-            self.query_parser.parse(query_string),
             cast,
             return_default,
             default_value
