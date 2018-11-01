@@ -85,6 +85,14 @@ class TestDPathQueryEngine:
         with pytest.raises(confrigulator.KeyNotFoundException):
             dpath_query_engine.query('root.something', root_layer_data)
 
+    def test_set(self, dpath_query_engine, root_layer_data):
+        with pytest.raises(confrigulator.KeyNotFoundException):
+            dpath_query_engine.set('root.new_key', 'new_value', root_layer_data, create=False)
+        assert dpath_query_engine.set('root.new_key', 'new_value', root_layer_data) == 1
+        assert dpath_query_engine.query('root.new_key', root_layer_data) == 'new_value'
+        assert dpath_query_engine.set('root.new_key', 'changed_value', root_layer_data, create=False)
+        assert dpath_query_engine.query('root.new_key', root_layer_data) == 'changed_value'
+
 
 class TestDictLayer:
 
@@ -103,3 +111,19 @@ class TestDictLayer:
 
     def test_get(self, root_layer):
         assert root_layer.get('root.root_branch_dict.root_branch_value') == 'original_value'
+        assert root_layer.get('root.no_key', 'not_found') == 'not_found'
+
+    def test_set(self, root_layer):
+        assert root_layer.set('root.new_key', 'new_value', create=False) == False
+        assert root_layer.set('root.new_key', 'new_value') == True
+        assert root_layer.get('root.new_key') == 'new_value'
+        assert root_layer.set('root.new_key', 'changed_value', create=False) == True
+        assert root_layer.get('root.new_key') == 'changed_value'
+
+    def test_delete(self, root_layer):
+        assert root_layer.set('root.new_key', 'new_value') == 1
+        assert root_layer.get('root.new_key') == 'new_value'
+        assert root_layer.remove('root.new_key') == 1
+        assert root_layer.exists('root.new_key') == False
+        with pytest.raises(confrigulator.KeyNotFoundException):
+            root_layer.remove('root.new_key')

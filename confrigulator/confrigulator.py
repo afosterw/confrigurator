@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import logging
 import dpath.util
+
+logger = logging.getLogger(__name__)
 
 class Interpolator(object):
     def __init__(self, config):
@@ -58,12 +61,21 @@ class DictLayer(Layer):
         except KeyNotFoundException:
             return default_value
 
-    def set(self, key, value):
-        self.dirty = True
-        self.data.set(key, value)
+    def set(self, key, value, create=True):
+        try:
+            self.query_engine.set(key, value, self.data, create=create)
+        except KeyNotFoundException as e:
+            logger.info(e)
+            return False
+    def remove(self, key):
+        try:
+            return bool(self.query_engine.remove(key, self.data))
+        except KeyNotFoundException as e:
+            logger.info(e)
+            return False
 
     def has_key(self, key):
-        return self.data.has_key(key)
+        return self.exists(key)
 
     def query(self, query_string):
         return self.query_engine.query(query_string, self.data)
@@ -97,6 +109,23 @@ class DPathQueryEngine:
             raise KeyNotFoundException(key)
         except IndexError as e:
             raise InvalidKeyException()
+
+    def set(self, key, value, data, create=True):
+        result = dpath.util.set(data, key, value, separator=self.delimiter)
+        if result == 0:
+            if create:
+                logger.debug('Creating new key {}'.format(key))
+                dpath.util.new(data, key, value, separator=self.delimiter)
+                return 1
+            else:
+                raise KeyNotFoundException(key)
+        return result
+
+    def remove(self, key, data):
+        try:
+            return dpath.util.delete(data, key, separator=self.delimiter)
+        except dpath.exceptions.PathNotFound as e:
+            raise(KeyNotFoundException(key))
 
 class ConfigQueryException(Exception):
     def __init__(self, message, query):
