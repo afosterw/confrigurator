@@ -4,6 +4,9 @@ import dpath.util
 
 logger = logging.getLogger(__name__)
 
+class KeyNotFoundException(Exception):
+    pass
+
 class Interpolator(object):
     def __init__(self, config):
         pass
@@ -63,7 +66,7 @@ class DictLayer(Layer):
 
     def set(self, key, value, create=True):
         try:
-            self.query_engine.set(key, value, self.data, create=create)
+            return bool(self.query_engine.set(key, value, self.data, create=create))
         except KeyNotFoundException as e:
             logger.info(e)
             return False
